@@ -1,0 +1,30 @@
+# Render blueprint: deploys the API (and the web client it serves) as one free web service.
+# Secrets marked sync: false are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: calsnap-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install --omit=optional && npm --prefix ../client install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.6-flash,gemini-3.5-flash
+      - key: AI_DAILY_SCAN_LIMIT
+        value: "20"
+      - key: AI_SCANS_PER_MINUTE
+        value: "5"
+      - key: AI_MAX_IMAGE_MB
+        value: "4"

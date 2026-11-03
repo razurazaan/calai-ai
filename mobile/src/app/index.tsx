@@ -1,0 +1,11 @@
+import { Redirect } from 'expo-router';
+
+import { useAuth } from '@/lib/auth';
+
+// Entry point: send people to the right place for their session state
+export default function Index() {
+  const { user } = useAuth();
+  if (!user) return <Redirect href="/login" />;
+  if (!user.onboarded) return <Redirect href="/onboarding" />;
+  return <Redirect href="/home" />;
+}
