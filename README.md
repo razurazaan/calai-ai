@@ -138,3 +138,4 @@ quota and network access. Failed analysis requests do not use a daily scan.
 Errors return `{ "message": "..." }` with these status codes: 400 invalid input, 413 image too large, 415 unsupported
 type, 422 no food detected, 429 scan limit or Gemini rate limit, 502/504 AI failure or timeout,
 503 AI not configured.
+# calai-ai
