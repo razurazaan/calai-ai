@@ -1,4 +1,6 @@
 const TOKEN_KEY = "calsnap_token";
+// Empty on the web (same-origin /api); the Android build sets VITE_API_URL to the server address
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) =>
@@ -11,7 +13,7 @@ export async function api(path, { method = "GET", body } = {}) {
 
   let res;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}/api${path}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,

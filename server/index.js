@@ -50,10 +50,10 @@ async function connectDb() {
   const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/calai";
   try {
     await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
-    console.log(`MongoDB connected: ${uri}`);
+    console.log("MongoDB connected successfully");
   } catch (err) {
     if (process.env.NODE_ENV === "production") throw err;
-    console.warn(`Could not reach ${uri} (${err.message}).`);
+    console.warn(`Could not reach MongoDB (${err.message}).`);
     console.warn("Starting a temporary in-memory MongoDB - data will be lost on restart.");
     const { MongoMemoryServer } = await import("mongodb-memory-server");
     const mem = await MongoMemoryServer.create();
