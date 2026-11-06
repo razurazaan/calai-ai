@@ -1,5 +1,6 @@
 # Builds the Android APK. Usage: .\build-apk.ps1 -ApiUrl https://your-server.com
-param([string]$ApiUrl = "http://192.168.1.15:5050")
+# The address is compiled into the APK, so it is required: a LAN IP stops working when it changes.
+param([Parameter(Mandatory = $true)][string]$ApiUrl)
 $ErrorActionPreference = "Stop"
 $env:JAVA_HOME = "D:\android-build\jdk-21.0.13.0.2+1"
 $env:GRADLE_USER_HOME = "D:\android-build\gradle"

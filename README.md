@@ -116,6 +116,7 @@ quota and network access. Failed analysis requests do not use a daily scan.
 | POST | /api/auth/weight | Log weight |
 | GET | /api/logs?date=YYYY-MM-DD | Entries and totals for a day |
 | GET | /api/logs/summary?from=&to= | Totals for each day |
+| GET | /api/logs/streak?today=YYYY-MM-DD | Consecutive logged days |
 | POST/PUT/DELETE | /api/logs/:id | Create, edit or delete an entry |
 | GET | /api/ai/usage | Today's AI scan quota |
 | POST | /api/ai/analyze | `{ image?: dataURL, description?: string }` → nutrition estimate |

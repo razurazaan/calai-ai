@@ -5,9 +5,10 @@ services:
     name: calsnap-api
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm install --omit=optional && npm --prefix ../client install && npm run build
-    startCommand: npm start
+    # No rootDir: the build needs both server/ and client/, and Render hides files outside rootDir.
+    # --include=dev: NODE_ENV=production would otherwise skip Vite, which the client build needs.
+    buildCommand: npm install --prefix server --omit=optional && npm install --prefix client --include=dev && npm run build --prefix client
+    startCommand: npm start --prefix server
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV

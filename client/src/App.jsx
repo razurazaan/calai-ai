@@ -20,7 +20,10 @@ export default function App() {
     if (!getToken()) return;
     api("/auth/me")
       .then(setUser)
-      .catch(() => setToken(null))
+      // Only drop the token if the server rejected it, not when it's just unreachable
+      .catch((err) => {
+        if (err.status === 401 || err.status === 404) setToken(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 

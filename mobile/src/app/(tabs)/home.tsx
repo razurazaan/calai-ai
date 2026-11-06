@@ -24,6 +24,7 @@ export default function Home() {
   const [date, setDate] = useState(today);
   const [data, setData] = useState<DayData>({ entries: [], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } });
   const [week, setWeek] = useState<Record<string, Nutrition>>({});
+  const [streak, setStreak] = useState(0);
   const [editing, setEditing] = useState<FoodLog | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
@@ -35,12 +36,14 @@ export default function Home() {
     const to = dateStr();
     try {
       setError('');
-      const [day, summary] = await Promise.all([
+      const [day, summary, streakRes] = await Promise.all([
         api<DayData>(`/logs?date=${date}`),
         api<{ days: Record<string, Nutrition> }>(`/logs/summary?from=${addDays(to, -6)}&to=${to}`),
+        api<{ streak: number }>(`/logs/streak?today=${to}`).catch(() => null), // not worth failing the screen over
       ]);
       setData(day);
       setWeek(summary.days);
+      if (streakRes) setStreak(streakRes.streak);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -71,7 +74,7 @@ export default function Home() {
         <Row between>
           <Txt variant="h1">🍎 CalSnap</Txt>
           <Row style={{ gap: 10 }}>
-            <Txt variant="small" muted>{streak(week, today)}🔥</Txt>
+            <Txt variant="small" muted>{streak}🔥</Txt>
             <Pressable
               onPress={() => setAdding(true)}
               accessibilityLabel="Log food"
@@ -197,17 +200,6 @@ export default function Home() {
       </Sheet>
     </View>
   );
-}
-
-// Consecutive days (ending today or yesterday) with something logged
-function streak(week: Record<string, Nutrition>, today: string) {
-  let n = 0;
-  let d = week[today]?.calories ? today : addDays(today, -1);
-  while (week[d]?.calories) {
-    n++;
-    d = addDays(d, -1);
-  }
-  return n;
 }
 
 const styles = StyleSheet.create({

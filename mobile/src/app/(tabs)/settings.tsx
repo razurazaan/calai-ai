@@ -47,7 +47,17 @@ export default function Settings() {
   const saveGoals = () =>
     run(
       'goals',
-      () => api<User>('/auth/goals', { method: 'PUT', body: Object.fromEntries(Object.entries(goals).map(([k, v]) => [k, Number(v)])) }),
+      async () => {
+        // A cleared field means "leave as is", so don't send it (Number('') would be 0)
+        const body = Object.fromEntries(
+          Object.entries(goals)
+            .filter(([, v]) => v.trim() !== '')
+            .map(([k, v]) => [k, Number(v)])
+        );
+        const u = await api<User>('/auth/goals', { method: 'PUT', body });
+        setGoals(toForm<Nutrition>(u.goals));
+        return u;
+      },
       'Goals saved'
     );
 

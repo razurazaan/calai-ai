@@ -40,6 +40,13 @@ app.use((err, _req, res, _next) => {
   if (err.type === "entity.parse.failed") {
     return res.status(400).json({ message: "Invalid request body" });
   }
+  // Bad input caught by Mongoose (invalid enum value, malformed id): the client's mistake, not a crash
+  if (err.name === "ValidationError") {
+    return res.status(400).json({ message: `Invalid value for ${Object.keys(err.errors).join(", ")}` });
+  }
+  if (err.name === "CastError") {
+    return res.status(400).json({ message: `Invalid value for ${err.path}` });
+  }
   // Log the message/stack only: body-parser errors carry the raw request body (which may be a photo)
   console.error(err.stack || err.message);
   const status = err.status || 500;

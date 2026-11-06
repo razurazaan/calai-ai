@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Bar, Button, Card, Dot, ErrorText, Input, Row, Segmented, Txt } from '@/components/ui';
 import { api } from '@/lib/api';
+import { applyNutrient, applyPortion, commitPortion, makeBase } from '@/lib/portion';
 import { useColors, type Palette } from '@/lib/theme';
 import type { Confidence, FoodDraft, MealType } from '@/lib/types';
 import { confirmAsync, guessMealType, MACROS } from '@/lib/utils';
@@ -40,6 +41,7 @@ export function FoodEditor({
     protein: str(initial.protein),
     carbs: str(initial.carbs),
     fat: str(initial.fat),
+    base: makeBase(initial),
   }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -50,22 +52,7 @@ export function FoodEditor({
   const servings = num(f.servings) || 1;
 
   // Correcting the portion weight rescales calories and macros proportionally
-  const setPortion = (v: string) =>
-    setF((prev) => {
-      const oldG = num(prev.portionGrams);
-      const newG = num(v);
-      if (!oldG || !newG) return { ...prev, portionGrams: v };
-      const r = newG / oldG;
-      const scale = (x: string) => (x === '' ? '' : String(Math.round(num(x) * r)));
-      return {
-        ...prev,
-        portionGrams: v,
-        calories: scale(prev.calories),
-        protein: scale(prev.protein),
-        carbs: scale(prev.carbs),
-        fat: scale(prev.fat),
-      };
-    });
+  const setPortion = (v: string) => setF((prev) => applyPortion(prev, v));
 
   async function save() {
     if (!f.name.trim()) return setError('Give this food a name');
@@ -167,7 +154,7 @@ export function FoodEditor({
             <TextInput
               keyboardType="number-pad"
               value={f.calories}
-              onChangeText={(v) => set('calories', v)}
+              onChangeText={(v) => setF((prev) => applyNutrient(prev, 'calories', v))}
               placeholder="0"
               placeholderTextColor={c.muted}
               style={{ fontSize: 32, fontWeight: '800', color: c.text, paddingVertical: 2 }}
@@ -186,6 +173,7 @@ export function FoodEditor({
         label={`⚖️ Portion per serving (g)${f.portionGrams !== '' ? ' · editing rescales the values' : ''}`}
         value={f.portionGrams}
         onChange={setPortion}
+        onBlur={() => setF((prev) => commitPortion(prev))}
         placeholder="e.g. 250"
       />
 
@@ -201,7 +189,7 @@ export function FoodEditor({
               </Row>
             }
             value={f[m.key]}
-            onChange={(v) => set(m.key, v)}
+            onChange={(v) => setF((prev) => applyNutrient(prev, m.key, v))}
             decimal
           />
         ))}
@@ -251,6 +239,7 @@ function NutriInput({
   label,
   value,
   onChange,
+  onBlur,
   placeholder,
   decimal,
   style,
@@ -258,6 +247,7 @@ function NutriInput({
   label: React.ReactNode;
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   decimal?: boolean;
   style?: object;
@@ -270,6 +260,7 @@ function NutriInput({
         keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
         value={value}
         onChangeText={onChange}
+        onBlur={onBlur}
         placeholder={placeholder}
         placeholderTextColor={c.muted}
         style={{ fontSize: 18, fontWeight: '700', color: c.text, paddingVertical: 2 }}

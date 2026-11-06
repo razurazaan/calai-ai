@@ -21,7 +21,12 @@ export default function Settings() {
     }
   }
 
-  const saveGoals = () => run(() => api("/auth/goals", { method: "PUT", body: goals }), "Goals saved");
+  const saveGoals = () =>
+    run(async () => {
+      const u = await api("/auth/goals", { method: "PUT", body: goals });
+      setGoals(u.goals); // a cleared field goes back to its saved value
+      return u;
+    }, "Goals saved");
   const recalc = () =>
     run(async () => {
       const u = await api("/auth/profile", { method: "PUT", body: { profile } });

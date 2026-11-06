@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
+import { applyNutrient, applyPortion, commitPortion, makeBase } from "../portion.js";
 import { guessMealType, MACROS } from "../utils.js";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
@@ -15,6 +16,7 @@ export default function FoodEditor({ initial, date, onSaved, onDeleted }) {
     protein: initial.protein ?? "",
     carbs: initial.carbs ?? "",
     fat: initial.fat ?? "",
+    base: makeBase(initial),
   }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -25,22 +27,8 @@ export default function FoodEditor({ initial, date, onSaved, onDeleted }) {
   const servings = num(f.servings) || 1;
 
   // Correcting the portion weight rescales calories and macros proportionally
-  const setPortion = (v) =>
-    setF((prev) => {
-      const oldG = num(prev.portionGrams);
-      const newG = num(v);
-      if (!oldG || !newG) return { ...prev, portionGrams: v };
-      const r = newG / oldG;
-      const scale = (x) => (x === "" ? "" : Math.round(num(x) * r));
-      return {
-        ...prev,
-        portionGrams: v,
-        calories: scale(prev.calories),
-        protein: scale(prev.protein),
-        carbs: scale(prev.carbs),
-        fat: scale(prev.fat),
-      };
-    });
+  const setPortion = (v) => setF((prev) => applyPortion(prev, v));
+  const setNutrient = (k, v) => setF((prev) => applyNutrient(prev, k, v));
 
   async function save() {
     if (!f.name.trim()) return setError("Give this food a name");
@@ -144,7 +132,7 @@ export default function FoodEditor({ initial, date, onSaved, onDeleted }) {
             type="number"
             inputMode="numeric"
             value={f.calories}
-            onChange={(e) => set("calories", e.target.value)}
+            onChange={(e) => setNutrient("calories", e.target.value)}
             style={{ border: "none", outline: "none", background: "transparent", fontSize: 32, fontWeight: 800, width: 140 }}
           />
         </div>
@@ -164,6 +152,7 @@ export default function FoodEditor({ initial, date, onSaved, onDeleted }) {
           placeholder="e.g. 250"
           value={f.portionGrams}
           onChange={(e) => setPortion(e.target.value)}
+          onBlur={() => setF(commitPortion)}
         />
       </div>
 
@@ -171,7 +160,7 @@ export default function FoodEditor({ initial, date, onSaved, onDeleted }) {
         {MACROS.map((m) => (
           <div key={m.key} className="nutri">
             <label><i className="dot" style={{ background: m.color }} />{m.label} (g)</label>
-            <input type="number" inputMode="decimal" value={f[m.key]} onChange={(e) => set(m.key, e.target.value)} />
+            <input type="number" inputMode="decimal" value={f[m.key]} onChange={(e) => setNutrient(m.key, e.target.value)} />
           </div>
         ))}
       </div>

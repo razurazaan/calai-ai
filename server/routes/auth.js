@@ -15,6 +15,8 @@ router.post(
     const { name, email, password } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ message: "Name, email and password are required" });
+    if (typeof name !== "string" || typeof email !== "string" || typeof password !== "string")
+      return res.status(400).json({ message: "Name, email and password must be text" });
     if (password.length < 6)
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     if (await User.findOne({ email: email.toLowerCase() }))
@@ -28,9 +30,11 @@ router.post(
 router.post(
   "/login",
   wrap(async (req, res) => {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email: (email || "").toLowerCase() });
-    if (!user || !(await bcrypt.compare(password || "", user.password)))
+    const { email = "", password = "" } = req.body;
+    if (typeof email !== "string" || typeof password !== "string")
+      return res.status(400).json({ message: "Email and password must be text" });
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(401).json({ message: "Wrong email or password" });
     res.json({ token: sign(user), user });
   })
@@ -77,8 +81,11 @@ router.put(
   wrap(async (req, res) => {
     const user = await User.findById(req.userId);
     for (const k of ["calories", "protein", "carbs", "fat"]) {
-      const v = Number(req.body[k]);
-      if (Number.isFinite(v) && v >= 0) user.goals[k] = Math.round(v);
+      // A cleared field means "leave as is", not 0. A calorie goal of 0 is never valid.
+      const raw = req.body[k];
+      if (raw === "" || raw == null) continue;
+      const v = Number(raw);
+      if (Number.isFinite(v) && v >= (k === "calories" ? 1 : 0)) user.goals[k] = Math.round(v);
     }
     await user.save();
     res.json(user);

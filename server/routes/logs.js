@@ -60,6 +60,28 @@ router.get(
   })
 );
 
+// GET /api/logs/streak?today=YYYY-MM-DD -> consecutive logged days ending today or yesterday.
+// `today` comes from the client because the day depends on the user's time zone.
+router.get(
+  "/streak",
+  wrap(async (req, res) => {
+    const { today } = req.query;
+    if (!DATE_RE.test(today || "") || Number.isNaN(Date.parse(`${today}T00:00:00Z`)))
+      return res.status(400).json({ message: "today is required" });
+    const logged = new Set(
+      await FoodLog.distinct("date", { user: req.userId, date: { $lte: today }, calories: { $gt: 0 } })
+    );
+    const dayBefore = (d) => new Date(Date.parse(`${d}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    let streak = 0;
+    let d = logged.has(today) ? today : dayBefore(today);
+    while (logged.has(d)) {
+      streak++;
+      d = dayBefore(d);
+    }
+    res.json({ streak });
+  })
+);
+
 router.post(
   "/",
   wrap(async (req, res) => {
@@ -74,9 +96,12 @@ router.post(
 router.put(
   "/:id",
   wrap(async (req, res) => {
+    const data = pick(req.body);
+    if (data.date !== undefined && !DATE_RE.test(data.date))
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
     const entry = await FoodLog.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
-      pick(req.body),
+      data,
       { new: true, runValidators: true }
     );
     if (!entry) return res.status(404).json({ message: "Entry not found" });

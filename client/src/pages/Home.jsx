@@ -14,6 +14,7 @@ export default function Home() {
   const [date, setDate] = useState(() => sessionStorage.getItem("calsnap_date") || today);
   const [data, setData] = useState({ entries: [], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } });
   const [week, setWeek] = useState({});
+  const [streak, setStreak] = useState(0);
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState("");
 
@@ -23,12 +24,14 @@ export default function Home() {
   const load = useCallback(async () => {
     try {
       setError("");
-      const [day, summary] = await Promise.all([
+      const [day, summary, streakRes] = await Promise.all([
         api(`/logs?date=${date}`),
         api(`/logs/summary?from=${weekStart}&to=${today}`),
+        api(`/logs/streak?today=${today}`).catch(() => null), // not worth failing the screen over
       ]);
       setData(day);
       setWeek(summary.days);
+      if (streakRes) setStreak(streakRes.streak);
     } catch (err) {
       setError(err.message);
     }
@@ -47,7 +50,7 @@ export default function Home() {
     <div className="app stack" style={{ gap: 16 }}>
       <div className="row between">
         <h1>🍎 CalSnap</h1>
-        <div className="muted small">{streak(week, today)}🔥</div>
+        <div className="muted small">{streak}🔥</div>
       </div>
 
       <div className="week">
@@ -140,15 +143,4 @@ export default function Home() {
       )}
     </div>
   );
-}
-
-// Consecutive days (ending today or yesterday) with something logged
-function streak(week, today) {
-  let n = 0;
-  let d = week[today]?.calories ? today : addDays(today, -1);
-  while (week[d]?.calories) {
-    n++;
-    d = addDays(d, -1);
-  }
-  return n;
 }
