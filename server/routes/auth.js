@@ -2,12 +2,12 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { requireAuth, JWT_SECRET } from "../middleware/auth.js";
+import { requireAuth, getJwtSecret } from "../middleware/auth.js";
 import { computeGoals } from "../utils/goals.js";
 import { wrap } from "../utils/wrap.js";
 
 const router = Router();
-const sign = (user) => jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "30d" });
+const sign = (user) => jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: "30d" });
 
 router.post(
   "/register",
