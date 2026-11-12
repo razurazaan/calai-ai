@@ -8,9 +8,10 @@ const router = Router();
 router.use(requireAuth);
 
 // ---- Config (all overridable from .env) -------------------------------------------------
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+// gemini-3.8-flash currently times out (504 DEADLINE_EXCEEDED); 3.5-flash answers in a few seconds
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 // Tried in order when the main model is overloaded or down (comma-separated in .env)
-const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.6-flash,gemini-3.5-flash")
+const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.5-flash-lite,gemini-3.6-flash")
   .split(",")
   .map((m) => m.trim())
   .filter((m) => m && m !== MODEL);

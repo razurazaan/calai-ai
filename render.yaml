@@ -20,9 +20,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: GEMINI_MODEL
-        value: gemini-3.8-flash
+        value: gemini-3.5-flash
       - key: GEMINI_FALLBACK_MODELS
-        value: gemini-3.6-flash,gemini-3.5-flash
+        value: gemini-3.5-flash-lite,gemini-3.6-flash
       - key: AI_DAILY_SCAN_LIMIT
         value: "20"
       - key: AI_SCANS_PER_MINUTE
