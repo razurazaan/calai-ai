@@ -10,6 +10,7 @@ import authRoutes from "./routes/auth.js";
 import logRoutes from "./routes/logs.js";
 import aiRoutes from "./routes/ai.js";
 import { initJwtSecret } from "./middleware/auth.js";
+import { loadGeminiKey } from "./utils/geminiKey.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.resolve(__dirname, "../client/dist");
@@ -82,6 +83,7 @@ const PORT = process.env.PORT || 5050;
 const HOST = process.env.HOST || "0.0.0.0"; // all interfaces: reachable from phones on the LAN
 connectDb()
   .then(initJwtSecret)
+  .then(loadGeminiKey)
   .then(() =>
     app.listen(PORT, HOST, () => {
       console.log(`API running on http://localhost:${PORT}`);
