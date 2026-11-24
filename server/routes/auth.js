@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User, { clientPlatform } from "../models/User.js";
-import { requireAuth, getJwtSecret, isAdminEmail } from "../middleware/auth.js";
+import { requireAuth, getJwtSecret, isAdminClient } from "../middleware/auth.js";
 import { computeGoals } from "../utils/goals.js";
 import { wrap } from "../utils/wrap.js";
 import { deleteUserAndData } from "../utils/deleteUser.js";
@@ -10,13 +10,15 @@ import { deleteUserAndData } from "../utils/deleteUser.js";
 const router = Router();
 const sign = (user) => jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: "30d" });
 
-// Stamp login stats and promote ADMIN_EMAILS accounts
-async function recordLogin(user) {
+// Stamp app login stats. Logging in to the admin website isn't app usage, so it is not counted.
+// Nobody is made admin here: the email isn't verified, so anyone could sign up with an admin's address.
+// Admins are created with scripts/make-admin.js or by another admin on the admin website.
+async function recordLogin(user, req) {
+  if (isAdminClient(req)) return;
   const now = new Date();
   user.lastLoginAt = now;
   user.lastActiveAt = now;
   user.loginCount = (user.loginCount || 0) + 1;
-  if (user.role !== "admin" && isAdminEmail(user.email)) user.role = "admin";
   await user.save();
 }
 
@@ -39,7 +41,7 @@ router.post(
       password: await bcrypt.hash(password, 10),
       signupPlatform: clientPlatform(req),
     });
-    await recordLogin(user);
+    await recordLogin(user, req);
     res.status(201).json({ token: sign(user), user });
   })
 );
@@ -54,7 +56,7 @@ router.post(
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(401).json({ message: "Wrong email or password" });
     if (user.disabled) return res.status(403).json({ message: "This account has been disabled." });
-    await recordLogin(user);
+    await recordLogin(user, req);
     res.json({ token: sign(user), user });
   })
 );
@@ -65,11 +67,6 @@ router.get(
   wrap(async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
-    // Existing sessions pick up ADMIN_EMAILS too, without logging out and in again
-    if (user.role !== "admin" && isAdminEmail(user.email)) {
-      user.role = "admin";
-      await user.save();
-    }
     res.json(user);
   })
 );

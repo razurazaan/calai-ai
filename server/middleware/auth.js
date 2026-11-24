@@ -31,31 +31,41 @@ export function getJwtSecret() {
   return secret;
 }
 
-// Emails in ADMIN_EMAILS (comma-separated) are made admins automatically when they log in
-export const isAdminEmail = (email) =>
-  (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(String(email).toLowerCase());
+// The admin website sends X-Client: admin. Its requests are not app usage.
+export const isAdminClient = (req) => String(req.headers["x-client"] || "").toLowerCase() === "admin";
 
-// userId -> { at, disabled, role }. Avoids a database read on every request; at most once a minute
-// per user we re-read the account (so a block takes effect within a minute) and stamp lastActiveAt.
+// userId -> { at, stampedAt, disabled, role }. Avoids a database read on every request; at most once a
+// minute per user we re-read the account (so a block takes effect within a minute). lastActiveAt is
+// stamped at most once a minute, and only for app requests (not the admin website).
 const statusCache = new Map();
 const CACHE_MS = 60_000;
 
 export const forgetUserStatus = (userId) => statusCache.delete(String(userId));
 
-async function userStatus(userId) {
-  const hit = statusCache.get(userId);
-  if (hit && Date.now() - hit.at < CACHE_MS) return hit;
+async function userStatus(userId, fromApp) {
   const User = mongoose.model("User");
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { $set: { lastActiveAt: new Date() } },
-    { projection: { disabled: 1, role: 1 } }
-  ).lean();
-  const status = { at: Date.now(), exists: Boolean(user), disabled: Boolean(user?.disabled), role: user?.role || "user" };
+  const now = Date.now();
+  const hit = statusCache.get(userId);
+  if (hit && now - hit.at < CACHE_MS) {
+    if (fromApp && hit.exists && now - hit.stampedAt >= CACHE_MS) {
+      hit.stampedAt = now;
+      User.updateOne({ _id: userId }, { $set: { lastActiveAt: new Date(now) } }).catch((err) =>
+        console.error("Could not stamp lastActiveAt:", err.message)
+      );
+    }
+    return hit;
+  }
+  const projection = { disabled: 1, role: 1 };
+  const user = fromApp
+    ? await User.findByIdAndUpdate(userId, { $set: { lastActiveAt: new Date(now) } }, { projection }).lean()
+    : await User.findById(userId, projection).lean();
+  const status = {
+    at: now,
+    stampedAt: fromApp ? now : hit?.stampedAt || 0,
+    exists: Boolean(user),
+    disabled: Boolean(user?.disabled),
+    role: user?.role || "user",
+  };
   statusCache.set(userId, status);
   return status;
 }
@@ -93,12 +103,12 @@ export async function requireAuth(req, res, next) {
     return res.status(401).json({ message: "Session expired, please log in again" });
   }
   try {
-    const status = await userStatus(String(req.userId));
+    const fromApp = !isAdminClient(req); // looking at the dashboard isn't app usage
+    const status = await userStatus(String(req.userId), fromApp);
     if (!status.exists) return res.status(401).json({ message: "Account not found, please log in again" });
     if (status.disabled) return res.status(403).json({ message: "This account has been disabled." });
     req.userRole = status.role;
-    // The admin website sends X-Client: admin; looking at the dashboard isn't app usage
-    if (req.headers["x-client"] !== "admin") trackActive(String(req.userId), clientPlatform(req));
+    if (fromApp) trackActive(String(req.userId), clientPlatform(req));
     next();
   } catch (err) {
     next(err);

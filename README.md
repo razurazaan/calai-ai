@@ -204,8 +204,10 @@ add a webhook route that creates a `Payment` and calls `activatePro()` from `ser
 Every `/api/ai/analyze` call (success or failure) is stored in the `aievents` collection. Photos themselves
 are not stored there; the thumbnail saved with each food log is.
 
-**Becoming an admin:** set `ADMIN_EMAILS=you@example.com` (comma-separated) in `server/.env` or the Render
-dashboard and log in, or run `node scripts/make-admin.js you@example.com` in `server/` (`--remove` to demote).
+**Becoming an admin:** sign up in the app, then run `node scripts/make-admin.js you@example.com` in `server/`
+with `MONGO_URI` pointing at the database (`--remove` to demote). An admin can also make other admins on the
+admin website. There is no automatic promotion by email: emails aren't verified, so anyone could sign up with an
+admin's address before its owner does.
 
 ## API
 | Method | Path | Purpose |

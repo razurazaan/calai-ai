@@ -29,6 +29,7 @@ export const dateOnly = (d) => (d ? new Date(d).toLocaleDateString(undefined, { 
 // "Pro" / "Pro (expired)" / nothing, from a user with plan + isPro from the API
 export function PlanBadge({ user }) {
   if (user.isPro && user.plan?.period === "trial") return <span className="badge pro">★ Trial</span>;
+  if (user.isPro && user.plan?.comp) return <span className="badge pro">★ Pro (free)</span>;
   if (user.isPro) return <span className="badge pro">★ Pro</span>;
   if (user.plan?.firstProAt) return <span className="badge warn">Pro lapsed</span>;
   return null;

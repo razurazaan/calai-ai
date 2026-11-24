@@ -58,7 +58,7 @@ export default function Overview() {
 
       <div className="section-title">Pro &amp; revenue</div>
       <div className="admin-grid tiles">
-        <Tile label="Paying Pro users" value={fmt(subs.active)} sub={`${fmt(subs.free)} free · ${fmt(subs.trial?.active || 0)} on trial`} />
+        <Tile label="Paying Pro users" value={fmt(subs.active)} sub={`${fmt(subs.free)} free · ${fmt(subs.trial?.active || 0)} on trial · ${fmt(subs.comp || 0)} given Pro free`} />
         <Tile label="On free trial" value={fmt(subs.trial?.active || 0)} sub={`${fmt(subs.trial?.startedInRange || 0)} started in ${days}d · ${pct(subs.trial?.conversionRate)} of trials paid`} />
         <Tile label="Conversion to Pro" value={pct(subs.conversionRate)} sub="of all users are Pro now" />
         <Tile label="New Pro users" value={fmt(subs.newInRange)} sub={`first payment in the last ${days} days`} />

@@ -74,7 +74,7 @@ export default function PlanCard({ user: u, payments, reload }) {
           </>
         ) : u.isPro ? (
           <>
-            <b>Pro ({plan.period})</b> via {plan.source?.replace("_", " ")} · since {dateOnly(plan.since)} ·{" "}
+            <b>Pro ({plan.period})</b> {plan.comp ? "given free (no payment)" : <>via {plan.source?.replace("_", " ")}</>} · since {dateOnly(plan.since)} ·{" "}
             {plan.expiresAt ? <>renews / expires <b>{dateOnly(plan.expiresAt)}</b></> : <b>never expires</b>}
           </>
         ) : plan.firstProAt ? (

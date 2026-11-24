@@ -1,0 +1,60 @@
+# Builds an UNSIGNED iPhone app (.ipa) on GitHub's free Mac computers, for testing only.
+# Start it from GitHub: Actions -> "iOS test build (unsigned .ipa)" -> Run workflow.
+# When it finishes, download "CalSnap-ipa" from the run page, then install it on the iPhone from
+# Windows with Sideloadly and a free Apple ID (the app then works for 7 days; install again after that).
+# For the App Store / TestFlight build, use codemagic.yaml instead.
+name: iOS test build (unsigned .ipa)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build the web app and copy it into the iOS project
+        working-directory: client
+        run: |
+          npm run build
+          npx cap sync ios
+
+      - name: Build the iPhone app without signing
+        run: |
+          xcodebuild \
+            -project client/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Pack it as an .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry CalSnap-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CalSnap-ipa
+          path: CalSnap-unsigned.ipa
+          retention-days: 14

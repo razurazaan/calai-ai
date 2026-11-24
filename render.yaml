@@ -32,8 +32,7 @@ services:
         value: "5"
       - key: AI_MAX_IMAGE_MB
         value: "4"
-      - key: ADMIN_EMAILS
-        sync: false
+      # Admins are made with `node scripts/make-admin.js you@example.com` (see README), not by email setting
 
   # Admin website: a separate static site that reads the API above.
   # After the first deploy, set VITE_API_URL to the API's address (e.g. https://calsnap-api.onrender.com)

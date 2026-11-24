@@ -1,6 +1,6 @@
 import { Router } from "express";
 import mongoose from "mongoose";
-import User, { isPro, proActiveQuery, payingQuery, trialQuery, PAID_PERIODS as PERIODS, PAYMENT_PROVIDERS as PROVIDERS } from "../models/User.js";
+import User, { isPro, proActiveQuery, payingQuery, trialQuery, compQuery, PAID_PERIODS as PERIODS, PAYMENT_PROVIDERS as PROVIDERS } from "../models/User.js";
 import FoodLog from "../models/FoodLog.js";
 import AiEvent from "../models/AiEvent.js";
 import Payment from "../models/Payment.js";
@@ -55,7 +55,7 @@ async function subscriptionStats(since, totalUsers) {
   const [
     proActive, byPeriod, bySource, newPro, lapsed, expiringSoon,
     paidRange, refundedRange, paidLifetime, mrrRows, newProDaily, revenueDaily,
-    onTrial, trialsStarted, trialsEver, trialsConverted, trialsDaily,
+    onTrial, trialsStarted, trialsEver, trialsConverted, trialsDaily, onComp,
   ] = await Promise.all([
     User.countDocuments(paying),
     User.aggregate([{ $match: active }, { $group: { _id: "$plan.period", n: { $sum: 1 } } }]),
@@ -99,6 +99,7 @@ async function subscriptionStats(since, totalUsers) {
       { $match: { "plan.trialStartedAt": { $gte: since } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$plan.trialStartedAt" } }, n: { $sum: 1 } } },
     ]),
+    User.countDocuments(compQuery(now)),
   ]);
 
   // Charts show one currency: the one with the most lifetime revenue
@@ -112,8 +113,9 @@ async function subscriptionStats(since, totalUsers) {
     trialsDaily: tally(trialsDaily),
     revenueDaily: revenueByDay,
     summary: {
-      active: proActive, // paying Pro (trials not included)
-      free: totalUsers - proActive - onTrial,
+      active: proActive, // paying Pro (trials and free admin grants not included)
+      comp: onComp, // Pro given free by an admin
+      free: totalUsers - proActive - onTrial - onComp,
       trial: { active: onTrial, startedInRange: trialsStarted, ever: trialsEver, converted: trialsConverted, conversionRate: trialsEver ? trialsConverted / trialsEver : null },
       prices: PRO_PRICES,
       conversionRate: totalUsers ? proActive / totalUsers : null,
@@ -335,6 +337,7 @@ function userFilter(q, status, platform) {
   if (status === "inactive") and.push({ $or: [{ lastActiveAt: null }, { lastActiveAt: { $lt: new Date(Date.now() - 30 * DAY_MS) } }] });
   if (status === "pro") and.push(payingQuery());
   if (status === "trial") and.push(trialQuery());
+  if (status === "comp") and.push(compQuery());
   if (status === "free") and.push({ $nor: [proActiveQuery()] });
   if (status === "lapsed") and.push({ "plan.firstProAt": { $ne: null } }, { $nor: [proActiveQuery()] });
   if (["web", "android", "ios"].includes(platform)) and.push({ $or: [{ lastPlatform: platform }, { signupPlatform: platform }] });
@@ -407,8 +410,12 @@ router.get(
   wrap(async (req, res) => {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
     const page = Math.max(1, Number(req.query.page) || 1);
-    const filter = userFilter(req.query.q, req.query.status, req.query.platform);
+    let filter = userFilter(req.query.q, req.query.status, req.query.platform);
     const sort = SORTS[req.query.sort] || SORTS.lastActive;
+    // "Pro expiring soonest" only lists Pro that is active and has an end date. Otherwise free users and
+    // lifetime Pro (no end date) would sort before every real expiry date.
+    if (req.query.sort === "expiring")
+      filter = { $and: [filter, proActiveQuery(), { "plan.expiresAt": { $ne: null } }] };
     const [total, users] = await Promise.all([
       User.countDocuments(filter),
       usersWithStats(filter, sort, (page - 1) * limit, limit),
@@ -520,7 +527,9 @@ router.patch(
     if (resetScansToday) user.scanUsage = { date: utcDay(), count: 0 };
     // plan: { tier: "pro", period, source?, expiresAt? (null = never) } | { tier: "free" }
     if (plan) {
-      if (plan.tier === "pro") activatePro(user, { period: plan.period, source: plan.source || "manual", expiresAt: plan.expiresAt });
+      // No payment comes with this, so it is a free grant unless the user is already on paid Pro
+      if (plan.tier === "pro")
+        activatePro(user, { period: plan.period, source: plan.source || "manual", expiresAt: plan.expiresAt, paid: false });
       else if (plan.tier === "free") cancelPro(user);
       else return res.status(400).json({ message: "Plan must be pro or free" });
     }
@@ -659,7 +668,10 @@ router.get(
 // ---- GET /api/admin/export/users.csv | ai-events.csv ---------------------------------------
 const csvCell = (v) => {
   if (v == null) return "";
-  const s = v instanceof Date ? v.toISOString() : String(v);
+  let s = v instanceof Date ? v.toISOString() : String(v);
+  // Text typed by users (names, food descriptions, notes) that starts with = + - @ or a tab would run as a
+  // formula when the file is opened in Excel. A leading ' makes Excel show it as plain text.
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 const toCsv = (header, rows) => [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
@@ -672,11 +684,11 @@ router.get(
       const users = await usersWithStats({}, { createdAt: -1 });
       csv = toCsv(
         ["id", "name", "email", "role", "disabled", "onboarded", "createdAt", "lastLoginAt", "lastActiveAt", "loginCount",
-          "signupPlatform", "lastPlatform", "plan", "proActive", "planPeriod", "planSource", "proSince", "proExpiresAt", "firstProAt",
+          "signupPlatform", "lastPlatform", "plan", "proActive", "planPeriod", "planSource", "proGivenFree", "proSince", "proExpiresAt", "firstProAt",
           "aiCalls", "aiPhoto", "aiText", "aiFailed", "tokens", "foodLogs", "daysLogged", "aiDailyLimit",
           "gender", "age", "heightCm", "weightKg", "targetWeightKg", "goal", "activity", "calorieGoal"],
         users.map((u) => [u._id, u.name, u.email, u.role, u.disabled, u.onboarded, u.createdAt, u.lastLoginAt, u.lastActiveAt, u.loginCount,
-          u.signupPlatform, u.lastPlatform, u.plan?.tier || "free", isPro(u), u.plan?.period, u.plan?.source, u.plan?.since, u.plan?.expiresAt, u.plan?.firstProAt,
+          u.signupPlatform, u.lastPlatform, u.plan?.tier || "free", isPro(u), u.plan?.period, u.plan?.source, Boolean(u.plan?.comp), u.plan?.since, u.plan?.expiresAt, u.plan?.firstProAt,
           u.stats.aiCalls, u.stats.aiPhoto, u.stats.aiText, u.stats.aiFailed, u.stats.tokens, u.stats.logs, u.stats.daysLogged, u.aiDailyLimit,
           u.profile?.gender, u.profile?.age, u.profile?.heightCm, u.profile?.weightKg, u.profile?.targetWeightKg, u.profile?.goal, u.profile?.activity, u.goals?.calories])
       );

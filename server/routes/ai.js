@@ -4,7 +4,7 @@ import User, { isPro } from "../models/User.js";
 import AiEvent from "../models/AiEvent.js";
 import { requireAuth } from "../middleware/auth.js";
 import { wrap } from "../utils/wrap.js";
-import { PRO_DAILY_LIMIT, aiLimitFor } from "../utils/subscription.js";
+import { PRO_DAILY_LIMIT, TRIAL_DAYS, aiLimitFor, canStartTrial } from "../utils/subscription.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -248,6 +248,8 @@ router.get(
     res.json({
       enabled: Boolean(process.env.GEMINI_API_KEY),
       plan: isPro(user) ? "pro" : "free",
+      trialEligible: Boolean(user) && canStartTrial(user),
+      trialDays: TRIAL_DAYS,
       proLimit: PRO_DAILY_LIMIT,
       limit,
       used,

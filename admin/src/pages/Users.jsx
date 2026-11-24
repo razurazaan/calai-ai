@@ -40,6 +40,7 @@ export default function Users() {
           <option value="">All users</option>
           <option value="pro">★ Pro (paying now)</option>
           <option value="trial">On free trial</option>
+          <option value="comp">Pro given free</option>
           <option value="free">Free plan</option>
           <option value="lapsed">Pro lapsed</option>
           <option value="active7">Active last 7 days</option>

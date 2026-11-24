@@ -25,31 +25,44 @@ export function addPeriod(from, period) {
 
 // Turn Pro on (or extend it) for a user document. Does not save.
 // - expiresAt given: use it exactly (null = never expires)
-// - otherwise: one `period` from now, or from the current expiry if Pro is still active (renewal)
+// - otherwise: one `period` from now, or from the current expiry if Pro is still active (renewal).
+//   An active lifetime plan stays lifetime: adding a month or a year to "never expires" changes nothing.
+// - paid: false for Pro an admin gives away without a payment (a "comp" grant). Comp Pro is not counted as
+//   a paying subscriber, doesn't set firstProAt, and doesn't use up the free trial. If the user is already
+//   on paid Pro, changing it without a payment keeps it paid.
 // Use this from a payment webhook too, so every source of Pro behaves the same way.
-export function activatePro(user, { period = "monthly", source = "manual", expiresAt } = {}) {
+export function activatePro(user, { period = "monthly", source = "manual", expiresAt, paid = true } = {}) {
   if (!PAID_PERIODS.includes(period)) throw Object.assign(new Error("Invalid plan period"), { status: 400 });
   if (!PROVIDERS.includes(source)) throw Object.assign(new Error("Invalid plan source"), { status: 400 });
   const now = new Date();
   const active = isPro(user, now);
   const plan = user.plan || {};
+  const activeLifetime = active && !plan.expiresAt && plan.period !== "trial";
 
   let expiry;
+  let newPeriod = period;
   if (expiresAt !== undefined) {
     expiry = expiresAt === null || expiresAt === "" ? null : new Date(expiresAt);
     if (expiry && Number.isNaN(expiry.getTime())) throw Object.assign(new Error("Invalid expiry date"), { status: 400 });
+  } else if (activeLifetime) {
+    expiry = null;
+    newPeriod = "lifetime";
   } else {
     const base = active && plan.expiresAt ? plan.expiresAt : now;
     expiry = addPeriod(base, period);
   }
 
+  const onPaidPro = active && plan.period !== "trial" && !plan.comp;
+  const comp = !paid && !onPaidPro;
+
   user.plan = {
     tier: "pro",
-    period,
+    period: newPeriod,
     source,
+    comp,
     since: active ? plan.since || now : now,
     expiresAt: expiry,
-    firstProAt: plan.firstProAt || now,
+    firstProAt: comp ? plan.firstProAt : plan.firstProAt || now,
     trialStartedAt: plan.trialStartedAt,
   };
 }

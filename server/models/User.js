@@ -59,6 +59,7 @@ const userSchema = new mongoose.Schema(
       tier: { type: String, enum: ["free", "pro"], default: "free", index: true },
       period: { type: String, enum: PERIODS },
       source: { type: String, enum: PROVIDERS },
+      comp: { type: Boolean, default: false }, // Pro given by an admin without a payment (not a paying subscriber)
       since: Date, // when the current Pro period started
       expiresAt: { type: Date, index: true },
       firstProAt: Date, // first time this user ever became paying Pro (for conversion analytics)
@@ -81,8 +82,12 @@ export const proActiveQuery = (now = new Date()) => ({
 });
 export const isPro = (user, now = new Date()) =>
   user?.plan?.tier === "pro" && (!user.plan.expiresAt || new Date(user.plan.expiresAt) > now);
-// Pro right now through a payment (not the free trial)
-export const payingQuery = (now = new Date()) => ({ $and: [proActiveQuery(now), { "plan.period": { $ne: "trial" } }] });
+// Pro right now through a payment (not the free trial, not Pro given free by an admin)
+export const payingQuery = (now = new Date()) => ({
+  $and: [proActiveQuery(now), { "plan.period": { $ne: "trial" } }, { "plan.comp": { $ne: true } }],
+});
+// Pro right now because an admin gave it without a payment
+export const compQuery = (now = new Date()) => ({ $and: [proActiveQuery(now), { "plan.comp": true }] });
 export const trialQuery = (now = new Date()) => ({ $and: [proActiveQuery(now), { "plan.period": "trial" }] });
 export const isOnTrial = (user, now = new Date()) => isPro(user, now) && user.plan.period === "trial";
 
