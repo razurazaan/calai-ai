@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { API_URL } from './config';
 import { getToken } from './storage';
 
@@ -12,7 +13,8 @@ export class ApiError extends Error {
 type Options = { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown };
 
 export async function api<T = any>(path: string, { method = 'GET', body }: Options = {}): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // X-Client tells the server which platform is in use (for the admin website's analytics)
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Client': Platform.OS };
   const token = await getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 

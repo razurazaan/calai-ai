@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api.js";
 import FoodEditor from "../components/FoodEditor.jsx";
 import { dateStr, resizeImage, shrinkDataUrl } from "../utils.js";
@@ -141,6 +141,13 @@ function AddFoodScreen() {
           )}
           {usage && usage.left === 0 && !error && (
             <button className="btn secondary" onClick={() => navigate("/add/manual")}>Add manually instead</button>
+          )}
+          {usage?.enabled && usage.plan === "free" && (
+            <Link to="/plans" className="small center" style={{ color: "var(--accent)", fontWeight: 600 }}>
+              {usage.trialEligible && usage.trialDays
+                ? `Need more scans? Try Pro free for ${usage.trialDays} days →`
+                : "Need more scans? Upgrade to Pro →"}
+            </Link>
           )}
         </>
       )}

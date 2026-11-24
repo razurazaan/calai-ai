@@ -3,8 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import { useAuth } from "../App.jsx";
 import Ring from "../components/Ring.jsx";
+import logo from "../assets/logo.png";
 import FoodEditor from "../components/FoodEditor.jsx";
 import Sheet from "../components/Sheet.jsx";
+import StepsCard, { StepsSheet } from "../components/StepsCard.jsx";
+import { healthConnected, syncHealthSteps } from "../steps.js";
 import { addDays, dateStr, MACROS, parseDate, timeOf } from "../utils.js";
 
 export default function Home() {
@@ -42,14 +45,39 @@ export default function Home() {
     load();
   }, [date, load]);
 
+  // Steps for the week: pulled from Health Connect / Apple Health when connected, then read back from the server
+  const [steps, setSteps] = useState({});
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const [healthOn, setHealthOn] = useState(healthConnected);
+
+  const loadSteps = useCallback(async () => {
+    if (healthConnected()) {
+      await syncHealthSteps(weekStart, today).catch((err) => {
+        console.warn("Step sync failed:", err.message);
+        setHealthOn(healthConnected());
+      });
+    }
+    const res = await api(`/steps?from=${weekStart}&to=${today}`).catch(() => null);
+    if (res) setSteps(res.days);
+  }, [weekStart, today]);
+
+  useEffect(() => {
+    loadSteps();
+    // Coming back to the app (steps have changed since): refresh
+    const onVisible = () => document.visibilityState === "visible" && loadSteps();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadSteps]);
+
   const { goals } = user;
+  const stepGoal = goals.steps || 10000;
   const t = data.totals;
   const left = goals.calories - t.calories;
 
   return (
     <div className="app stack" style={{ gap: 16 }}>
       <div className="row between">
-        <h1>🍎 CalSnap</h1>
+        <h1 className="row" style={{ gap: 8 }}><img src={logo} alt="" width="34" height="34" />CalSnap</h1>
         <div className="muted small">{streak}🔥</div>
       </div>
 
@@ -84,6 +112,16 @@ export default function Home() {
           <span style={{ fontSize: 30 }}>🔥</span>
         </Ring>
       </div>
+
+      <StepsCard
+        date={date}
+        today={today}
+        entry={steps[date]}
+        goal={stepGoal}
+        profile={user.profile}
+        healthOn={healthOn}
+        onOpen={() => setStepsOpen(true)}
+      />
 
       <div className="macros">
         {MACROS.map((m) => {
@@ -130,6 +168,20 @@ export default function Home() {
             </div>
           </button>
         ))
+      )}
+
+      {stepsOpen && (
+        <StepsSheet
+          date={date}
+          today={today}
+          weekDays={weekDays}
+          days={steps}
+          goal={stepGoal}
+          healthOn={healthOn}
+          onHealthChange={setHealthOn}
+          onChanged={loadSteps}
+          onClose={() => setStepsOpen(false)}
+        />
       )}
 
       {editing && (

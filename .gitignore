@@ -1,3 +1,11 @@
 node_modules/
 .env
 dist/
+
+# Live-update bundles (built on deploy)
+client/updates/
+
+# Android release signing (keep the keystore and passwords out of git)
+client/android/keystore.properties
+*.jks
+*.keystore

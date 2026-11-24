@@ -1,0 +1,48 @@
+# Builds the CalSnap iPhone app on Codemagic's cloud Macs (no Mac needed) and uploads it to TestFlight.
+# Setup, once: see "iPhone app" in README.md (Apple Developer account, App Store Connect API key,
+# app record for in.fantek.calsnap). Then start the "CalSnap iOS" workflow from the Codemagic dashboard.
+#
+# Only needed for native changes (new plugin, permission, icon, app name) and the first release.
+# Everyday changes reach installed apps through live updates when the server is deployed.
+workflows:
+  ios-testflight:
+    name: CalSnap iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: CalSnap App Store Connect # the API key's name in Codemagic -> Team integrations
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: in.fantek.calsnap
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install dependencies
+        script: cd client && npm ci
+      - name: Build the web app and copy it into the iOS project
+        script: |
+          cd client
+          npm run build
+          npx cap sync ios
+      - name: Set the app version from client/package.json
+        script: |
+          cd client
+          VERSION=$(node -p "require('./package.json').nativeVersion")
+          # Every TestFlight upload needs a higher build number: use Codemagic's build counter
+          sed -i '' \
+            -e "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $VERSION;/" \
+            -e "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/" \
+            ios/App/App.xcodeproj/project.pbxproj
+          echo "CalSnap $VERSION (build $BUILD_NUMBER)"
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build the .ipa
+        script: xcode-project build-ipa --project "client/ios/App/App.xcodeproj" --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

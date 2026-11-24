@@ -18,3 +18,5 @@ console.log("Building the web client...");
 // --include=dev: NODE_ENV=production would otherwise skip Vite
 run("npm install --include=dev --no-audit --no-fund");
 run("npm run build");
+// The same build, zipped as a live update for the Android / iPhone apps (served from /updates)
+run("npm run bundle");

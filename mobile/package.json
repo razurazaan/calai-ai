@@ -40,7 +40,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "iphone": "expo start --go --tunnel",
+    "iphone": "expo start --go --lan",
+    "iphone:tunnel": "expo start --go --tunnel ngrok",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",

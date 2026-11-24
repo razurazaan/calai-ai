@@ -1,16 +1,22 @@
 {
   "name": "calai-client",
   "version": "1.0.0",
+  "nativeVersion": "1.0.0",
+  "nativeBuild": 2,
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "bundle": "node scripts/make-bundle.js",
     "preview": "vite preview"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "~8.6.0",
+    "@capgo/capacitor-health": "^8.13.0",
+    "@capgo/capacitor-updater": "^8.54.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"
@@ -18,6 +24,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "fflate": "^0.8.3",
     "vite": "^6.0.5"
   }
 }

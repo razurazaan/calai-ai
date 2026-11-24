@@ -9,6 +9,10 @@ import { fileURLToPath } from "node:url";
 import authRoutes from "./routes/auth.js";
 import logRoutes from "./routes/logs.js";
 import aiRoutes from "./routes/ai.js";
+import adminRoutes from "./routes/admin.js";
+import billingRoutes from "./routes/billing.js";
+import stepRoutes from "./routes/steps.js";
+import appRoutes, { updatesDir } from "./routes/app.js";
 import { initJwtSecret } from "./middleware/auth.js";
 import { loadGeminiKey } from "./utils/geminiKey.js";
 
@@ -25,7 +29,14 @@ app.get("/api/health", (_req, res) =>
 app.use("/api/auth", authRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/billing", billingRoutes);
+app.use("/api/steps", stepRoutes);
+app.use("/api/app", appRoutes);
 app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found" }));
+
+// Live-update bundles for the apps. A bundle's file name contains its version, so it never changes.
+app.use("/updates", express.static(updatesDir, { fallthrough: false, immutable: true, maxAge: "365d" }));
 
 app.use(express.static(clientDist));
 app.get("*", (req, res, next) => {

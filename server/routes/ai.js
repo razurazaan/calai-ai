@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { GoogleGenAI, ApiError, ThinkingLevel } from "@google/genai";
-import User from "../models/User.js";
+import User, { isPro } from "../models/User.js";
+import AiEvent from "../models/AiEvent.js";
 import { requireAuth } from "../middleware/auth.js";
 import { wrap } from "../utils/wrap.js";
+import { PRO_DAILY_LIMIT, aiLimitFor } from "../utils/subscription.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -15,7 +17,6 @@ const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.5-flash
   .split(",")
   .map((m) => m.trim())
   .filter((m) => m && m !== MODEL);
-const DAILY_LIMIT = Number(process.env.AI_DAILY_SCAN_LIMIT) || 20;
 const PER_MINUTE_LIMIT = Number(process.env.AI_SCANS_PER_MINUTE) || 5;
 const MAX_IMAGE_BYTES = (Number(process.env.AI_MAX_IMAGE_MB) || 4) * 1024 * 1024;
 const MAX_DESCRIPTION = 500;
@@ -94,10 +95,21 @@ const num = (n) => Math.max(0, Math.round(Number(n) || 0));
 const conf = (c) => (["high", "medium", "low"].includes(c) ? c : "medium");
 
 class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code; // analytics status for AiEvent (falls back to one derived from the HTTP status)
   }
+}
+
+// The user's daily AI limit: an admin override, else 3 on the free plan / 20 on Pro (utils/subscription.js)
+const limitOf = aiLimitFor;
+
+function eventStatus(err) {
+  if (!err) return "success";
+  if (err.code) return err.code;
+  if ([400, 413, 415].includes(err.status)) return "invalid";
+  return "error";
 }
 
 // Check the bytes really are the image type they claim to be
@@ -132,7 +144,7 @@ function checkBurst(userId) {
   const now = Date.now();
   const list = (recent.get(userId) || []).filter((t) => now - t < 60_000);
   if (list.length >= PER_MINUTE_LIMIT) {
-    throw new HttpError(429, "You're scanning too fast. Please wait a minute and try again.");
+    throw new HttpError(429, "You're scanning too fast. Please wait a minute and try again.", "rate-limited");
   }
   list.push(now);
   recent.set(userId, list);
@@ -141,19 +153,29 @@ function checkBurst(userId) {
 // Atomically reserve one scan from today's quota. Returns scans left after this one.
 async function reserveScan(userId) {
   const day = utcDay();
+  const owner = await User.findById(userId, "aiDailyLimit plan").lean();
+  const limit = limitOf(owner);
   await User.updateOne(
     { _id: userId, "scanUsage.date": { $ne: day } },
     { $set: { "scanUsage.date": day, "scanUsage.count": 0 } }
   );
   const user = await User.findOneAndUpdate(
-    { _id: userId, "scanUsage.date": day, "scanUsage.count": { $lt: DAILY_LIMIT } },
+    { _id: userId, "scanUsage.date": day, "scanUsage.count": { $lt: limit } },
     { $inc: { "scanUsage.count": 1 } },
     { new: true, projection: { scanUsage: 1 } }
   );
   if (!user) {
-    throw new HttpError(429, `You've used all ${DAILY_LIMIT} AI scans for today. You can still add food manually.`);
+    throw new HttpError(
+      429,
+      limit === 0
+        ? "AI scanning is turned off for your account. You can still add food manually."
+        : isPro(owner) || Number.isFinite(owner?.aiDailyLimit)
+          ? `You've used all ${limit} AI scans for today. You can still add food manually.`
+          : `You've used your ${limit} free AI scans for today. Upgrade to Pro for ${PRO_DAILY_LIMIT} scans a day, or add food manually.`,
+      "quota"
+    );
   }
-  return DAILY_LIMIT - user.scanUsage.count;
+  return limit - user.scanUsage.count;
 }
 
 const refundScan = (userId) =>
@@ -220,13 +242,16 @@ function toHttpError(err) {
 router.get(
   "/usage",
   wrap(async (req, res) => {
-    const user = await User.findById(req.userId, "scanUsage");
+    const user = await User.findById(req.userId, "scanUsage aiDailyLimit plan");
     const used = user?.scanUsage?.date === utcDay() ? user.scanUsage.count : 0;
+    const limit = limitOf(user);
     res.json({
       enabled: Boolean(process.env.GEMINI_API_KEY),
-      limit: DAILY_LIMIT,
+      plan: isPro(user) ? "pro" : "free",
+      proLimit: PRO_DAILY_LIMIT,
+      limit,
       used,
-      left: Math.max(0, DAILY_LIMIT - used),
+      left: Math.max(0, limit - used),
     });
   })
 );
@@ -234,17 +259,25 @@ router.get(
 // POST /api/ai/analyze  { image?: dataURL, description?: string }
 router.post("/analyze", async (req, res) => {
   let reserved = false;
+  const started = Date.now();
+  const { image, description } = req.body || {};
+  const text = typeof description === "string" ? description.trim() : "";
+  // Filled in as the request progresses, then saved once at the end (success or failure)
+  const event = {
+    user: req.userId,
+    kind: image ? "photo" : "text",
+    description: text.slice(0, MAX_DESCRIPTION) || undefined,
+  };
   try {
     if (!process.env.GEMINI_API_KEY) {
       throw new HttpError(503, "AI is not configured. Add GEMINI_API_KEY to server/.env and restart the server.");
     }
 
-    const { image, description } = req.body || {};
-    const text = typeof description === "string" ? description.trim() : "";
     if (text.length > MAX_DESCRIPTION)
       throw new HttpError(400, `Description is too long (max ${MAX_DESCRIPTION} characters).`);
     if (!image && !text) throw new HttpError(400, "Send a photo or a description");
     const img = image ? parseImage(image) : null;
+    if (img) event.imageBytes = Math.floor((img.data.length * 3) / 4);
 
     checkBurst(req.userId);
     const scansLeft = await reserveScan(req.userId);
@@ -265,6 +298,15 @@ router.post("/analyze", async (req, res) => {
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       },
     });
+    event.model = model;
+    const usage = response.usageMetadata;
+    if (usage) {
+      event.tokens = {
+        prompt: usage.promptTokenCount,
+        output: (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0),
+        total: usage.totalTokenCount,
+      };
+    }
 
     if (response.promptFeedback?.blockReason) {
       throw new HttpError(422, "This image couldn't be analyzed. Please try another photo.");
@@ -278,7 +320,7 @@ router.post("/analyze", async (req, res) => {
     if (!result.isFood) {
       // Still counts as a scan (the request was made), so no refund
       reserved = false;
-      throw new HttpError(422, "No food detected. Try a clearer photo or add a description.");
+      throw new HttpError(422, "No food detected. Try a clearer photo or add a description.", "no-food");
     }
 
     const items = (Array.isArray(result.items) ? result.items : []).map((i) => ({
@@ -297,7 +339,7 @@ router.post("/analyze", async (req, res) => {
       ? { portionGrams: sum("portionGrams"), calories: sum("calories"), protein: sum("protein"), carbs: sum("carbs"), fat: sum("fat") }
       : { portionGrams: num(result.portionGrams), calories: num(result.calories), protein: num(result.protein), carbs: num(result.carbs), fat: num(result.fat) };
 
-    res.json({
+    const out = {
       name: String(result.foodName || "Meal"),
       ...totals,
       confidence: conf(result.confidence),
@@ -308,12 +350,36 @@ router.post("/analyze", async (req, res) => {
       items,
       scansLeft,
       model,
-    });
+    };
+    event.result = {
+      name: out.name,
+      calories: out.calories,
+      protein: out.protein,
+      carbs: out.carbs,
+      fat: out.fat,
+      confidence: out.confidence,
+      healthScore: out.healthScore,
+      itemCount: items.length,
+    };
+    res.json(out);
+    recordEvent(event, started, null, 200);
   } catch (err) {
     if (reserved) await refundScan(req.userId);
     const httpErr = toHttpError(err);
     res.status(httpErr.status).json({ message: httpErr.message });
+    recordEvent(event, started, httpErr, httpErr.status);
   }
 });
+
+// Never let analytics break (or slow down) the user's request
+function recordEvent(event, started, err, httpStatus) {
+  AiEvent.create({
+    ...event,
+    status: eventStatus(err),
+    httpStatus,
+    error: err?.message,
+    latencyMs: Date.now() - started,
+  }).catch((e) => console.warn(`Could not record AI event: ${e.message}`));
+}
 
 export default router;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api.js";
 import { useAuth } from "../App.jsx";
+import logo from "../assets/logo.png";
 
 export default function Auth() {
   const { login } = useAuth();
@@ -28,7 +29,7 @@ export default function Auth() {
   return (
     <div className="app" style={{ display: "flex", flexDirection: "column", justifyContent: "center", minHeight: "100vh", paddingBottom: 16 }}>
       <div className="center" style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 56 }}>🍎</div>
+        <img src={logo} alt="" width="88" height="88" style={{ display: "block", margin: "0 auto 8px" }} />
         <h1>CalSnap</h1>
         <p className="muted" style={{ marginTop: 6 }}>Snap a photo. Know your calories.</p>
       </div>

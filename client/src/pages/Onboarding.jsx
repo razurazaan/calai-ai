@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { applyTheme } from "../theme.js";
 import { useAuth } from "../App.jsx";
 import { dateStr } from "../utils.js";
 
@@ -29,6 +30,8 @@ export default function Onboarding() {
   const [busy, setBusy] = useState(false);
 
   const set = (k, v) => setP((prev) => ({ ...prev, [k]: v }));
+  // Preview the colours as soon as gender is picked
+  useEffect(() => applyTheme(p.gender), [p.gender]);
   const bodyValid = p.age >= 10 && p.age <= 100 && p.heightCm >= 100 && p.heightCm <= 250 && p.weightKg >= 25 && p.weightKg <= 350;
 
   async function finish() {

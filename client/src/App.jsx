@@ -7,7 +7,11 @@ import Home from "./pages/Home.jsx";
 import AddFood from "./pages/AddFood.jsx";
 import Progress from "./pages/Progress.jsx";
 import Settings from "./pages/Settings.jsx";
+import Plans from "./pages/Plans.jsx";
+import Fitness from "./pages/Fitness.jsx";
+import Muscle from "./pages/Muscle.jsx";
 import BottomNav from "./components/BottomNav.jsx";
+import { applyTheme } from "./theme.js";
 
 const AuthCtx = createContext(null);
 export const useAuth = () => useContext(AuthCtx);
@@ -26,6 +30,12 @@ export default function App() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Pink theme for women; back to the default after logout
+  const gender = user?.profile?.gender;
+  useEffect(() => {
+    if (!loading) applyTheme(gender);
+  }, [loading, gender]);
 
   const login = (token, u) => {
     setToken(token);
@@ -61,6 +71,10 @@ export default function App() {
             <Route path="/add/:mode" element={<AddFood />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/plans" element={<Plans />} />
+            <Route path="/fitness" element={<Fitness />} />
+            <Route path="/fitness/:id" element={<Muscle />} />
+            <Route path="/fitness/women/:id" element={<Muscle women />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <BottomNav />

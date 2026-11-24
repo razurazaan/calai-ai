@@ -12,8 +12,24 @@
   --fat: #4a86e8;
   --good: #2fa866;
   --danger: #d93a3a;
+  --icon: #4a2c1d; /* dark brown, matches the coffee bean in the logo */
+  --on-icon: #ffffff; /* icon/text on a var(--icon) fill (active nav pill, add button) */
   --shadow: 0 2px 14px rgba(0, 0, 0, 0.05);
   --radius: 20px;
+  /* dark "hero" cards (fitness, steps) and the steps scene */
+  --hero: #0f2a3d;
+  --hero-2: #133a50;
+  --hero-rgb: 15, 42, 61;
+  --hero-text: #dbe4ea;
+  --step-accent: #a6f08a;
+  --step-accent-2: #4fd1a5;
+  --step-label: #9fd8c0;
+  --step-bar: #4fa3c4;
+  --hill-far: #1f5f78;
+  --hill-near: #2b8a86;
+  --hill-front: #33a08f;
+  --tree: #3aa58c;
+  --sun: #ffd27a;
   color-scheme: light;
 }
 
@@ -27,6 +43,7 @@
     --primary: #f3f3f5;
     --on-primary: #111114;
     --soft: #222228;
+    --icon: #a8714d; /* lighter coffee brown so icons stay visible on the dark background */
     --shadow: none;
     color-scheme: dark;
   }
@@ -131,24 +148,141 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 .chips { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
 
-/* Bottom nav */
+/* Bottom nav: floating glass bar with a gooey active pill (components/BottomNav.jsx, from React Bits GooeyNav) */
 .nav {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; pointer-events: none;
+  padding: 0 12px calc(10px + env(safe-area-inset-bottom));
+}
+.nav-inner {
+  pointer-events: auto; position: relative; max-width: 456px; margin: 0 auto;
+  display: flex; align-items: center; height: 66px; padding: 0 6px; border-radius: 26px;
   background: color-mix(in srgb, var(--card) 88%, transparent);
-  backdrop-filter: blur(16px); border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  /* particle colours: shades of the theme colour */
+  --gnav-c1: var(--icon);
+  --gnav-c2: color-mix(in srgb, var(--icon) 70%, #ffffff);
+  --gnav-c3: color-mix(in srgb, var(--icon) 45%, #ffffff);
+  --gnav-c4: color-mix(in srgb, var(--icon) 75%, #000000);
 }
-.nav-inner { max-width: 480px; margin: 0 auto; display: flex; align-items: center; height: 68px; padding: 0 16px; }
-.nav a {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-size: 11px; color: var(--muted); text-decoration: none; font-weight: 500;
+.gnav-tab {
+  position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 11px; font-weight: 500; text-decoration: none;
+  color: color-mix(in srgb, var(--icon) 60%, transparent); transition: color 0.3s ease;
 }
-.nav a.active { color: var(--text); }
+.gnav-tab.active { color: var(--icon); font-weight: 700; }
+.gnav-icon {
+  width: 56px; height: 32px; display: grid; place-items: center; border-radius: 999px;
+  transition: color 0.3s ease, transform 0.15s ease;
+}
+.gnav-tab.active .gnav-icon { color: var(--on-icon); }
+.gnav-tab:active .gnav-icon { transform: scale(0.9); }
+.gnav-tab:focus-visible { outline: none; }
+.gnav-tab:focus-visible .gnav-icon { box-shadow: 0 0 0 2px var(--icon); }
+
+/* Goo layer behind the tabs. It reaches above the bar so particles aren't cut off. */
+.gnav-layer { position: absolute; left: 0; right: 0; top: -40px; bottom: 0; pointer-events: none; filter: url(#gnav-goo); }
+.gnav-effect { position: absolute; width: 0; height: 0; transition: opacity 0.2s; }
+.gnav-effect.hidden { opacity: 0; }
+.gnav-pill { position: absolute; left: -28px; top: -16px; width: 56px; height: 32px; border-radius: 999px; background: var(--icon); }
+.gnav-pill.pop { animation: gnav-pill 0.3s ease both; }
+@supports (animation-timing-function: linear(0, 1)) {
+  /* springy overshoot, from GooeyNav's --linear-ease */
+  .gnav-pill.pop {
+    animation: gnav-pill 0.6s both linear(0, 0.068, 0.19 2.7%, 0.804 8.1%, 1.037, 1.199 13.2%, 1.245, 1.27 15.8%, 1.274,
+      1.272 17.4%, 1.249 19.1%, 0.996 28%, 0.949, 0.928 33.3%, 0.926, 0.933 36.8%, 1.001 45.6%, 1.013, 1.019 50.8%,
+      1.018 54.4%, 1 63.1%, 0.995 68%, 1.001 85%, 1);
+  }
+}
+@keyframes gnav-pill { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.gnav-particle, .gnav-point { display: block; width: 12px; height: 12px; border-radius: 50%; opacity: 0; transform-origin: center; }
+.gnav-particle { position: absolute; left: -6px; top: -6px; animation: gnav-particle var(--time) ease 1 -350ms; }
+.gnav-point { background: var(--color); opacity: 1; animation: gnav-point var(--time) ease 1 -350ms; }
+@keyframes gnav-particle {
+  0% { transform: rotate(0deg) translate(var(--start-x), var(--start-y)); opacity: 1; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+  70% { transform: rotate(calc(var(--rotate) * 0.5)) translate(calc(var(--end-x) * 1.2), calc(var(--end-y) * 1.2)); opacity: 1; animation-timing-function: ease; }
+  85% { transform: rotate(calc(var(--rotate) * 0.66)) translate(var(--end-x), var(--end-y)); opacity: 1; }
+  100% { transform: rotate(calc(var(--rotate) * 1.2)) translate(calc(var(--end-x) * 0.5), calc(var(--end-y) * 0.5)); opacity: 1; }
+}
+@keyframes gnav-point {
+  0% { transform: scale(0); opacity: 0; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+  25% { transform: scale(calc(var(--scale) * 0.25)); }
+  38% { opacity: 1; }
+  65% { transform: scale(var(--scale)); opacity: 1; animation-timing-function: ease; }
+  85% { transform: scale(var(--scale)); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+.gnav-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .gnav-pill.pop { animation: none; }
+  .gnav-tab, .gnav-icon { transition: none; }
+}
+
 .fab {
-  width: 58px; height: 58px; border-radius: 50%; background: var(--primary); color: var(--on-primary);
-  display: grid; place-items: center; font-size: 30px; margin: 0 8px; margin-top: -26px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  position: relative; z-index: 1; flex: none;
+  width: 56px; height: 56px; border-radius: 50%; background: var(--icon); color: var(--on-icon);
+  display: grid; place-items: center; font-size: 30px; margin: -30px 6px 0;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--icon) 45%, transparent);
+  transition: transform 0.15s ease;
 }
+.fab:active { transform: scale(0.92); }
+
+/* Fitness / exercises */
+.ex-header { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; text-align: center; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--icon); }
+.icon-btn.on { background: var(--soft); }
+.search {
+  display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px;
+  background: var(--soft); border-radius: 14px; color: var(--muted);
+}
+.search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font-size: 15px; color: var(--text); }
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-chips button {
+  height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: var(--soft); color: var(--text);
+}
+.filter-chips button.active { background: var(--icon); color: #fff; }
+.muscle-card {
+  position: relative; display: flex; align-items: center; height: 96px; padding-left: 20px;
+  background: var(--hero); border-radius: 16px; overflow: hidden;
+  color: #fff; text-decoration: none; font-weight: 600; font-size: 16px;
+  transition: transform 0.1s;
+}
+.muscle-card:active { transform: scale(0.98); }
+.muscle-card.photo { background-size: cover; background-repeat: no-repeat; }
+/* fade the photo into navy on the left so the label stays readable */
+.muscle-card.photo::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--hero) 0%, rgba(var(--hero-rgb), 0.85) 30%, rgba(var(--hero-rgb), 0.15) 70%, rgba(var(--hero-rgb), 0) 100%);
+}
+.muscle-card.photo span { position: relative; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); }
+.muscle-banner { height: 190px; border-radius: 20px; background-color: var(--hero); background-size: cover; background-repeat: no-repeat; }
+.muscle-figure { position: absolute; right: 12px; top: 6px; height: calc(100% - 6px); width: 56%; }
+.muscle-hero {
+  display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 20px;
+  background: var(--hero); color: var(--hero-text); font-size: 14px; line-height: 1.45;
+}
+.muscle-hero p { margin: 0; flex: 1; }
+.exercise { width: 100%; text-align: left; display: block; }
+.exercise-name { font-weight: 700; font-size: 16px; }
+.exercise-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.exercise-tags span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+.exercise-sets { display: flex; flex-direction: column; align-items: flex-end; text-align: right; color: var(--icon); white-space: nowrap; }
+.exercise-steps { margin: 14px 0 0; padding-left: 20px; color: var(--text); font-size: 14px; line-height: 1.5; }
+.exercise-steps li + li { margin-top: 4px; }
+.exercise-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; padding: 0; }
+.exercise-detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.5; }
+.exercise-detail h4 { margin: 14px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--icon); }
+.exercise-detail .exercise-steps { margin-top: 6px; }
+.exercise-about { margin: 0; }
+.exercise-targets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.exercise-targets .target { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--icon); color: #fff; }
+.exercise-list { margin: 6px 0 0; padding-left: 20px; }
+.exercise-list li + li { margin-top: 4px; }
+.exercise-list.tips li::marker { color: var(--good); }
+.exercise-list.avoid li::marker { color: var(--danger); }
+.exercise-easier { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--soft); }
+.women-intro { margin: 0; padding: 14px 16px; border-radius: 16px; background: var(--soft); font-size: 13px; line-height: 1.5; color: var(--text); }
 
 /* Bottom sheet / modal */
 .backdrop {
@@ -222,3 +356,208 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 .conf-high { color: var(--good); }
 .conf-medium { color: var(--carbs); }
 .conf-low { color: var(--danger); }
+
+/* ---------- Plans page (pricing cards) ---------- */
+:root {
+  --accent: #5b5bf0;
+  --accent-soft: rgba(91, 91, 240, 0.12);
+  --plan-bg: var(--card);
+  --plan-line: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --accent: #8183ff; --accent-soft: rgba(129, 131, 255, 0.16); --plan-bg: #15151b; --plan-line: #2c2c36; }
+}
+
+.plans-page { max-width: 1040px; margin: 0 auto; min-height: 100vh; padding: 16px 16px 120px; }
+.center-load { display: grid; place-items: center; min-height: 60vh; }
+.back-link { text-decoration: none; display: inline-block; margin-bottom: 8px; }
+.plans-hero { text-align: center; margin: 8px auto 22px; max-width: 520px; }
+.plans-hero h1 { font-size: 30px; }
+.plans-hero p { margin: 8px 0 0; font-size: 15px; line-height: 1.5; }
+.plans-msg {
+  background: var(--accent-soft); color: var(--text); border: 1px solid var(--accent);
+  padding: 12px 14px; border-radius: 12px; font-size: 14px; margin-bottom: 14px;
+}
+
+.plans-grid { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: stretch; }
+@media (min-width: 860px) { .plans-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.plan {
+  position: relative; height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 24px 22px 22px; border-radius: 18px;
+  background: var(--plan-bg); border: 1px solid var(--plan-line);
+  overflow: hidden; isolation: isolate;
+}
+.plan.current { border: 1.5px solid var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* Spotlight: soft light that follows the pointer */
+.spotlight::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), var(--accent-soft), transparent 60%);
+  opacity: 0; transition: opacity 0.3s;
+}
+.spotlight:hover::before { opacity: 1; }
+
+.plan-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
+.plan-head h3 { font-size: 17px; font-weight: 700; }
+.plan.highlight .plan-head h3 { color: var(--accent); }
+.pill {
+  font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: var(--soft); color: var(--muted); white-space: nowrap;
+}
+.pill.current { background: var(--accent-soft); color: var(--accent); }
+
+.plan-price { display: flex; align-items: baseline; gap: 6px; }
+.plan-price .amount { font-size: 38px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.plan-price .unit { color: var(--muted); font-size: 15px; }
+.plan-note { font-size: 13px; color: var(--muted); margin-top: -8px; }
+.plan-intro { font-weight: 700; font-size: 14px; }
+
+.plan-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.plan-features li { display: flex; gap: 10px; font-size: 14px; line-height: 1.45; }
+.plan-features svg {
+  flex: none; width: 16px; height: 16px; margin-top: 2px;
+  fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.plan-features b { font-weight: 700; }
+
+.plan-action { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.plan-btn {
+  width: 100%; height: 46px; border-radius: 12px; font-weight: 600; font-size: 15px;
+  background: var(--soft); color: var(--text); border: 1px solid var(--plan-line);
+  transition: transform 0.1s, filter 0.2s, opacity 0.2s;
+}
+.plan-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.plan-btn:active:not(:disabled) { transform: scale(0.98); }
+.plan-btn:disabled { cursor: default; color: var(--muted); }
+.plan-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.plan-sub { font-size: 13px; color: var(--accent); text-align: center; font-weight: 600; }
+.plans-foot { margin-top: 22px; line-height: 1.5; }
+
+/* Shiny text: a light sweep across the text */
+.shiny {
+  background: linear-gradient(110deg, currentColor 35%, var(--accent) 50%, currentColor 65%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: shine 3.5s linear infinite;
+}
+@keyframes shine { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+
+/* Glowing, slowly rotating border around the highlighted plan */
+@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.glow-border {
+  position: relative; border-radius: 20px; padding: 2px; height: 100%; box-sizing: border-box;
+  background: conic-gradient(from var(--angle), transparent 0deg, var(--accent) 60deg, transparent 140deg, transparent 220deg, var(--accent) 300deg, transparent 360deg);
+  animation: spin-border 6s linear infinite;
+}
+.glow-border > .plan { border-color: transparent; }
+.glow-border > .plan.current { border-color: var(--accent); }
+@keyframes spin-border { to { --angle: 360deg; } }
+
+/* Plan card in Settings */
+.plan-link { text-decoration: none; color: inherit; }
+.plan-link .tag { font-size: 12px; font-weight: 700; color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shiny, .glow-border { animation: none; }
+  .spotlight::before { display: none; }
+}
+
+/* ---------- Daily steps card: an illustrated trail on the right, numbers on the left ---------- */
+.steps-card {
+  --accent: var(--step-accent);
+  --accent-soft: color-mix(in srgb, var(--step-accent) 16%, transparent);
+  position: relative; isolation: isolate; overflow: hidden; cursor: pointer;
+  min-height: 160px; padding: 20px 22px; border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--hero) 0%, var(--hero-2) 100%); color: #fff;
+  box-shadow: var(--shadow); outline: none; transition: transform 0.1s;
+}
+.steps-card:active { transform: scale(0.99); }
+.steps-card:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); }
+.steps-card.spotlight::before { z-index: 1; }
+.steps-scene { position: absolute; right: 0; bottom: 0; width: 64%; height: 100%; }
+/* fade the scene into navy on the left so the numbers stay readable */
+.steps-fade {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, var(--hero) 0%, rgba(var(--hero-rgb), 0.92) 36%, rgba(var(--hero-rgb), 0) 72%);
+}
+.steps-body { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 2px; max-width: 60%; }
+.steps-label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--step-label); letter-spacing: 0.2px; }
+.steps-count { font-size: 40px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.steps-goal { font-size: 13px; color: rgba(255, 255, 255, 0.68); font-weight: 600; }
+.steps-bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.14); overflow: hidden; margin-top: 12px; }
+.steps-bar > div {
+  height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--step-accent-2), var(--step-accent));
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.steps-meta { display: flex; gap: 14px; margin-top: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.78); white-space: nowrap; }
+.steps-badge {
+  font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14); color: #e8f5ee; letter-spacing: 0.3px; text-transform: uppercase;
+}
+.foot { fill: rgba(255, 255, 255, 0.28); transition: fill 0.3s; }
+.foot.lit { fill: var(--step-accent); animation: foot-pop 0.45s ease-out both; animation-delay: calc(var(--i) * 90ms); }
+@keyframes foot-pop { from { opacity: 0; } }
+
+/* 7-day steps bars in the steps sheet */
+.steps-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.steps-week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.steps-week-track { width: 100%; max-width: 26px; height: 90px; border-radius: 8px; background: var(--soft); display: flex; align-items: flex-end; overflow: hidden; }
+.steps-week-track > div { width: 100%; border-radius: 8px; background: var(--step-bar); transition: height 0.4s; }
+.steps-week-day.done .steps-week-track > div { background: var(--good); }
+.steps-week-day.active { color: var(--text); font-weight: 700; }
+.steps-week-day.active .steps-week-track { box-shadow: inset 0 0 0 2px var(--line); }
+
+@media (prefers-reduced-motion: reduce) {
+  .foot.lit { animation: none; }
+  .steps-bar > div { transition: none; }
+}
+
+/* ---------- Pink theme: used when the logged-in user's gender is female (theme.js) ---------- */
+:root[data-theme="female"] {
+  --bg: #fdf4f8;
+  --card: #ffffff;
+  --text: #2b1621;
+  --muted: #9b7f8c;
+  --line: #f4dde8;
+  --primary: #e0558c;
+  --on-primary: #ffffff;
+  --soft: #fbe8f0;
+  --icon: #c93b77;
+  --shadow: 0 2px 14px rgba(201, 59, 119, 0.08);
+  --accent: #e0558c;
+  --accent-soft: rgba(224, 85, 140, 0.13);
+  --hero: #4a1d3c;
+  --hero-2: #6e2a58;
+  --hero-rgb: 74, 29, 60;
+  --hero-text: #f7dcea;
+  --step-accent: #ff9ccb;
+  --step-accent-2: #ff6fa8;
+  --step-label: #ffc4dd;
+  --step-bar: #f08cb7;
+  --hill-far: #7b2f63;
+  --hill-near: #a4457f;
+  --hill-front: #c45d95;
+  --tree: #e690bd;
+  --sun: #ffd6a8;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="female"] {
+    --bg: #140a10;
+    --card: #22131c;
+    --text: #fbedf4;
+    --muted: #ad8f9d;
+    --line: #3b2330;
+    --primary: #ff7eb3;
+    --on-primary: #2a0d1c;
+    --soft: #2f1a26;
+    --icon: #ff8cc0;
+    --on-icon: #2a0d1c; /* white is too faint on this light pink */
+    --shadow: none;
+    --accent: #ff8cc0;
+    --accent-soft: rgba(255, 140, 192, 0.16);
+    --plan-bg: #1d1018;
+    --plan-line: #3e2432;
+  }
+}

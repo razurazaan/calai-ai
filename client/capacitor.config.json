@@ -2,6 +2,23 @@
   "appId": "in.fantek.calsnap",
   "appName": "CalSnap",
   "webDir": "dist",
-  "server": { "androidScheme": "https", "cleartext": true },
-  "android": { "allowMixedContent": true }
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": true,
+      "updateUrl": "https://calai-ai.onrender.com/api/app/update",
+      "channelUrl": "https://calai-ai.onrender.com/api/app/channel",
+      "statsUrl": "",
+      "appReadyTimeout": 10000,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true,
+      "resetWhenUpdate": true
+    }
+  }
 }

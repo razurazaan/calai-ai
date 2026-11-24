@@ -1,5 +1,16 @@
 apply plugin: 'com.android.application'
 
+// The app version lives in client/package.json, shared with the iPhone app and the live updates:
+//   nativeVersion -> versionName (live updates are only offered to apps with this exact version)
+//   nativeBuild   -> versionCode (must go up for every upload to the Play Store; build-aab.ps1 does it)
+def clientPackage = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+
+// Release signing: android/keystore.properties (not in git) points to the upload keystore.
+// build-aab.ps1 creates both the first time.
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) keystorePropsFile.withInputStream { keystoreProps.load(it) }
+
 android {
     namespace = "in.fantek.calsnap"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +18,8 @@ android {
         applicationId "in.fantek.calsnap"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode clientPackage.nativeBuild as Integer
+        versionName clientPackage.nativeVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +27,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            release {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePropsFile.exists()) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
